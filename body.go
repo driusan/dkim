@@ -17,5 +17,17 @@ func ReadSMTPBodyRelaxed(r io.Reader) (raw []byte, err error) {
 		raw = append(raw, line...)
 		raw = append(raw, '\r', '\n')
 	}
-	return raw, nil
+
+	// Trim trailing \r\n
+	for {
+		trimmed := bytes.TrimSuffix(raw, []byte("\r\n"))
+		if string(trimmed) == string(raw) {
+			break
+		}
+		raw = trimmed
+	}
+	if len(raw) == 0 {
+		return raw, nil
+	}
+	return append(raw, '\r', '\n'), nil
 }

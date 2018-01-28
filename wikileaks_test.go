@@ -3,6 +3,7 @@ package dkim
 import (
 	//"fmt"
 	"encoding/base64"
+	"os"
 
 	"crypto/rsa"
 	"crypto/x509"
@@ -222,17 +223,12 @@ oon</font></span></p></div>
 `
 
 	r, err := FileBuffer(NormalizeReader(strings.NewReader(body)))
-	sig, headers, encoded, err := signatureBase(r)
+	sig, msg, sighead, err := signatureBase(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "dR8juwuev4e6Fvx8i83p3bEGBvVNoqjMODydu5jBO3w="; want != encoded {
-		t.Fatalf("Unexpected body hash: got %v want %v", encoded, want)
-	}
-
-	msg, sighead, err := dkimMessageBase(*sig, headers)
-	if err != nil {
-		t.Fatal(err)
+	if err := os.Remove(r.Name()); err != nil {
+		t.Error(err)
 	}
 
 	// Snapshot of the key from the DNS record at the time of writing this test..
@@ -255,4 +251,37 @@ oon</font></span></p></div>
 	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
 		t.Error(err)
 	}
+
+	// Add some newlines and try again, since it's relaxed body
+	// canonicalization this should still succeed.
+	r, err = FileBuffer(NormalizeReader(strings.NewReader(body + "\r\n\r\n")))
+	sig, msg, sighead, err = signatureBase(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(r.Name()); err != nil {
+		t.Error(err)
+	}
+
+	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
+		t.Error(err)
+	}
+
+	// Change a random character and ensure that it fails.
+
+	bodybyte := []byte(body)
+	bodybyte[2048] = 'q'
+	r, err = FileBuffer(NormalizeReader(strings.NewReader(string(bodybyte))))
+
+	sig, msg, sighead, err = signatureBase(r)
+	if err == nil {
+		t.Error("Modified body in signatureBase did not return error")
+	}
+	if err := os.Remove(r.Name()); err != nil {
+		t.Error(err)
+	}
+
+	/*	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err == nil {
+		t.Error("Modified body was verified")
+	}*/
 }
