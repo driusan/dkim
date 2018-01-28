@@ -223,7 +223,7 @@ oon</font></span></p></div>
 `
 
 	r, err := FileBuffer(NormalizeReader(strings.NewReader(body)))
-	sig, msg, sighead, err := signatureBase(r)
+	sig, msg, sighead, err := signatureBase(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,14 +248,14 @@ oon</font></span></p></div>
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
+	if err := dkimVerify(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
 		t.Error(err)
 	}
 
 	// Add some newlines and try again, since it's relaxed body
 	// canonicalization this should still succeed.
 	r, err = FileBuffer(NormalizeReader(strings.NewReader(body + "\r\n\r\n")))
-	sig, msg, sighead, err = signatureBase(r)
+	sig, msg, sighead, err = signatureBase(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ oon</font></span></p></div>
 		t.Error(err)
 	}
 
-	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
+	if err := dkimVerify(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
 		t.Error(err)
 	}
 
@@ -273,7 +273,7 @@ oon</font></span></p></div>
 	bodybyte[2048] = 'q'
 	r, err = FileBuffer(NormalizeReader(strings.NewReader(string(bodybyte))))
 
-	sig, msg, sighead, err = signatureBase(r)
+	sig, msg, sighead, err = signatureBase(r, nil)
 	if err == nil {
 		t.Error("Modified body in signatureBase did not return error")
 	}

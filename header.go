@@ -58,16 +58,12 @@ var whitespaceRE *regexp.Regexp = regexp.MustCompile("[\t \n\r]+")
 //var whitespaceRE *regexp.Regexp = regexp.MustCompile("[\t \n]+")
 var headerRE *regexp.Regexp = regexp.MustCompile("^([[:graph:]]+)[[:space:]]*:[[:space:]]*")
 
-func ReadSMTPHeaderRelaxed(r io.ReadSeeker) (raw, converted []byte, err error) {
-	rawb, err := readRawHeader(r)
-	if err != nil {
-		return nil, nil, err
-	}
+func relaxHeader(rawb []byte) []byte {
 	conv := whitespaceRE.ReplaceAll(rawb, []byte{' '})
 	split := headerRE.FindSubmatchIndex(conv)
 	if split == nil {
 		// This should probably be an error?
-		return raw, conv, nil
+		return conv
 	}
 
 	convheader := bytes.ToLower(conv[split[2]:split[3]])
@@ -77,5 +73,13 @@ func ReadSMTPHeaderRelaxed(r io.ReadSeeker) (raw, converted []byte, err error) {
 	final = append(final, ':')
 	final = append(final, body...)
 	final = append(final, '\r', '\n')
+	return final
+}
+func ReadSMTPHeaderRelaxed(r io.ReadSeeker) (raw, converted []byte, err error) {
+	rawb, err := readRawHeader(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	final := relaxHeader(rawb)
 	return rawb, final, err
 }
