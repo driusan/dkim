@@ -14,14 +14,18 @@ import (
 	"encoding/pem"
 )
 
-func signmessage(sig dkim.Signature, key *rsa.PrivateKey) error {
+func signmessage(sig dkim.Signature, key *rsa.PrivateKey, unix bool) error {
 	file, err := dkim.FileBuffer(dkim.NormalizeReader(os.Stdin))
 	if err != nil {
 		return err
 	}
 	defer os.Remove(file.Name())
 
-	if err := dkim.SignMessage(sig, file, os.Stdout, key); err != nil {
+	var nl string
+	if unix {
+		nl = "\n"
+	}
+	if err := dkim.SignMessage(sig, file, os.Stdout, key, nl); err != nil {
 		return err
 	}
 	return nil
@@ -35,6 +39,7 @@ func main() {
 	flag.StringVar(&s, "s", "", "Domain selector")
 	flag.StringVar(&domain, "d", "", "Domain name")
 	flag.StringVar(&headers, "h", "From:Subject:To:Date", "Colon separated list of headers to sign")
+	nl := flag.Bool("n", false, `Print final message with \n instead of \r\n line endings`)
 	privatekey := flag.String("key", "", "Location of PEM encoded private key")
 	flag.Parse()
 
@@ -73,7 +78,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := signmessage(sig, key); err != nil {
+	if err := signmessage(sig, key, *nl); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}

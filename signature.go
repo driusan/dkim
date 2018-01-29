@@ -48,20 +48,20 @@ func (s Signature) String() string {
 
 	ret += fmt.Sprintf("; c=%v/%v", h, b)
 	if s.Domain != "" {
-		ret += fmt.Sprintf(";\r\n\td=%v", s.Domain)
+		ret += fmt.Sprintf("; d=%v", s.Domain)
 	}
 	if s.Selector != "" {
 		ret += fmt.Sprintf("; s=%v", s.Selector)
 	}
 	if len(s.Headers) > 0 {
-		ret += fmt.Sprintf(";\r\n\th=%v", strings.Join(s.Headers, ":"))
+		ret += fmt.Sprintf("; h=%v", strings.Join(s.Headers, ":"))
 	}
 	if s.BodyHash != "" {
-		ret += fmt.Sprintf(";\r\n\tbh=%v", s.BodyHash)
+		ret += fmt.Sprintf("; bh=%v", s.BodyHash)
 	}
 
 	// Always include an empty b= tag if one doesn't exist.
-	ret += fmt.Sprintf(";\r\n\tb=%v", s.Body)
+	ret += fmt.Sprintf("; b=%v", s.Body)
 	return ret
 }
 
@@ -250,7 +250,10 @@ var bRE = regexp.MustCompile("b=.+($|;)")
 // SignMessage signs the message in r with the signature parameters from s and
 // the private key key, writing the result with the added DKIM-Signature to
 // dst.
-func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey) error {
+func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+	if nl != "\n" {
+		nl = "\r\n"
+	}
 	sig, msg, basedkimsig, err := signatureBase(r, &s)
 	b, err := signDKIMMessage(msg, basedkimsig, s.Algorithm, key)
 	if err != nil {
@@ -268,15 +271,15 @@ func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKe
 		}
 		line := linescan.Text()
 		if strings.HasPrefix(line, "From ") {
-			fmt.Fprintf(dst, "%v\r\n", line)
+			fmt.Fprintf(dst, "%v%v", line, nl)
 			continue
 		}
 		if !addedSig {
 			addedSig = true
-			fmt.Fprintf(dst, "%v\r\n", sig)
-			fmt.Fprintf(dst, "%v\r\n", line)
+			fmt.Fprintf(dst, "%v%v", sig, nl)
+			fmt.Fprintf(dst, "%v%v", line, nl)
 		} else {
-			fmt.Fprintf(dst, "%v\r\n", line)
+			fmt.Fprintf(dst, "%v%v", line, nl)
 		}
 	}
 	return nil
