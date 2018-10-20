@@ -247,6 +247,20 @@ func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimhead
 
 var bRE = regexp.MustCompile("b=.+($|;)")
 
+func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+	if nl != "\n" {
+		nl = "\r\n"
+	}
+	sig, msg, basedkimsig, err := signatureBase(r, &s)
+	b, err := signDKIMMessage(msg, basedkimsig, s.Algorithm, key)
+	if err != nil {
+		return err
+	}
+	sig.Body = b
+	fmt.Fprintf(dst, "%v%v", sig, nl)
+	return nil
+}
+
 // SignMessage signs the message in r with the signature parameters from s and
 // the private key key, writing the result with the added DKIM-Signature to
 // dst.
