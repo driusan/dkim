@@ -14,8 +14,12 @@ import (
 	"encoding/pem"
 )
 
-func signmessage(sig dkim.Signature, key *rsa.PrivateKey, unix bool) error {
-	file, err := dkim.FileBuffer(dkim.NormalizeReader(os.Stdin))
+func signmessage(sig dkim.Signature, key *rsa.PrivateKey, unix bool, dotstuffed bool) error {
+	r := dkim.NormalizeReader(os.Stdin)
+	if dotstuffed {
+		r.Unstuff()
+	}
+	file, err := dkim.FileBuffer(r)
 	if err != nil {
 		return err
 	}
@@ -35,10 +39,12 @@ func main() {
 	var canon string = "relaxed/relaxed"
 	var s, domain string
 	var headers string
+	var unstuff bool
 	flag.StringVar(&canon, "c", "relaxed/relaxed", "Canonicalization scheme")
 	flag.StringVar(&s, "s", "", "Domain selector")
 	flag.StringVar(&domain, "d", "", "Domain name")
 	flag.StringVar(&headers, "h", "From:Subject:To:Date", "Colon separated list of headers to sign")
+	flag.BoolVar(&unstuff, "u", false, "Assume input is already SMTP dot stuffed when calculating signature and un dot-stuff it while printing")
 	nl := flag.Bool("n", false, `Print final message with \n instead of \r\n line endings`)
 	privatekey := flag.String("key", "", "Location of PEM encoded private key")
 	flag.Parse()
@@ -78,7 +84,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err := signmessage(sig, key, *nl); err != nil {
+	if err := signmessage(sig, key, *nl, unstuff); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}

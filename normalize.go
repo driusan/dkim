@@ -22,8 +22,14 @@ type normalizeReader struct {
 	// call.
 	leftOver []byte
 	eof      bool
+
+	unstuff bool
 }
 
+// If called, the reader will un dot-stuff lines that it reads.
+func (n *normalizeReader) Unstuff() {
+	n.unstuff = true
+}
 func (n *normalizeReader) Read(r []byte) (int, error) {
 	var err error
 	// If there's already enough from the last read to fill this buffer,
@@ -48,6 +54,9 @@ func (n *normalizeReader) Read(r []byte) (int, error) {
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\r', '\n'}, []byte{'\n'}, -1)
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\r'}, []byte{'\n'}, -1)
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\n'}, []byte{'\r', '\n'}, -1)
+	if n.unstuff {
+		n.leftOver = bytes.Replace(n.leftOver, []byte{'\n', '.'}, []byte{'\n'}, -1)
+	}
 	// If there's up to len(r), fill up r and return the amount that
 	// was read.
 	if len(n.leftOver) <= len(r) {
@@ -82,6 +91,6 @@ func FileBuffer(r io.Reader) (*os.File, error) {
 	return tempfile, err
 }
 
-func NormalizeReader(r io.Reader) io.Reader {
-	return &normalizeReader{r, nil, false}
+func NormalizeReader(r io.Reader) *normalizeReader {
+	return &normalizeReader{r, nil, false, false}
 }
