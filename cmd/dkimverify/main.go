@@ -6,17 +6,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/driusan/dkim"
 )
 
 func main() {
 	pubkey := flag.String("txt", "", "Use argument file as DNS TXT entry instead of looking it up")
+	hd := flag.String("hd", "", "Print the results to an SMTP header on stdout instead of stderr")
+	hdprefix := flag.String("hdprefix", "", "Prefix the results of the header with this string")
+	hdsuffix := flag.String("hdsuffix", "", "Suffix the results of the header with this string")
 	flag.Parse()
 
 	var key *rsa.PublicKey
 	if *pubkey != "" {
-		// This assumes the
 		keybytes, err := ioutil.ReadFile(*pubkey)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -45,8 +48,8 @@ func main() {
 				fmt.Fprintln(os.Stderr, err)
 			}
 
-			if err := dkim.VerifyWithPublicKey(file, key); err != nil {
-				fmt.Fprintf(os.Stderr, "%v: %v\n", f, err)
+			if err := dkim.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
+				printResult(*hd, *hdprefix, *hdsuffix, f, err)
 				numfails++
 			}
 			file.Close()
@@ -61,8 +64,8 @@ func main() {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		if err := dkim.VerifyWithPublicKey(file, key); err != nil {
-			fmt.Fprintf(os.Stderr, "<stdin>: %v\n", err)
+		if err := dkim.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
+			printResult(*hd, *hdprefix, *hdsuffix, "<stdin>", err)
 			numfails++
 		}
 		if err := os.Remove(file.Name()); err != nil {
@@ -71,4 +74,20 @@ func main() {
 
 	}
 	os.Exit(numfails)
+}
+
+// Helper to print the results for either stdin or per file.
+func printResult(hd, hdprefix, hdsuffix string, filename string, err error) {
+	if hd != "" {
+		if err == nil {
+			fmt.Printf("%v: %vPass%v\n", hd, hdprefix, hdsuffix)
+		} else if errstr := err.Error(); errstr == "Permanent failure: no DKIM signature" || strings.Index(errstr, "Temporary failure") >= 0 {
+			// Nothing
+		} else {
+			fmt.Printf("%v: %vFail%v\n", hd, hdprefix, hdsuffix)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "%v: %v\n", filename, err)
+	}
+
 }

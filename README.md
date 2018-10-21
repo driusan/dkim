@@ -16,6 +16,12 @@ it will exit with a success status, otherwise it will exit with an
 exit code of the number of messages that failed validation.  For each
 one, it will print the reason for the failure to stderr.
 
+The `-hd` parameter takes a string argument and instead of printing to
+stderr, will print an SMTP header of that name with a value of "Pass"
+or "Fail" to stdout.  Temporary failures or no DKIM signature present
+in a message will print nothing.  `-hdprefix` or `hdsuffix` can be
+used to add a prefix or suffix to the header value.
+
 The dkimverify tool can be used without any special configuration.
 
 ## Signing DKIM Signatures
