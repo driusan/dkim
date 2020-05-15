@@ -23,6 +23,9 @@ func readRawHeader(r io.ReadSeeker) (raw []byte, err error) {
 	if err != io.EOF && err != nil {
 		return nil, err
 	}
+	if err == io.EOF && n == 0 {
+		return nil, io.EOF
+	}
 	buf = buf[:n]
 	re := headerEndRE.FindIndex(buf)
 	if re == nil {
