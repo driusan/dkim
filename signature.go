@@ -109,6 +109,9 @@ func splitTags(s []byte) []Tag {
 	var tgs []Tag
 	tags := bytes.Split(s, []byte{';'})
 	for _, t := range tags {
+		if strings.TrimSpace(string(t)) == "" {
+			continue
+		}
 		splitb := bytes.SplitN(t, []byte{'='}, 2)
 		tgs = append(tgs, Tag{string(bytes.TrimSpace(splitb[0])), string(splitb[1])})
 	}
