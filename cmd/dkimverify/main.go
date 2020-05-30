@@ -4,11 +4,10 @@ import (
 	"crypto/rsa"
 	"flag"
 	"fmt"
+	"github.com/driusan/dkim/pkg"
 	"io/ioutil"
 	"os"
 	"strings"
-
-	"github.com/driusan/dkim"
 )
 
 func main() {
@@ -25,7 +24,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		dkey, err := dkim.DecodeDNSTXT(string(keybytes))
+		dkey, err := pkg.DecodeDNSTXT(string(keybytes))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -43,12 +42,12 @@ func main() {
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
-			file, err := dkim.FileBuffer(dkim.NormalizeReader(fd))
+			file, err := pkg.FileBuffer(pkg.NormalizeReader(fd))
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 			}
 
-			if err := dkim.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
+			if err := pkg.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
 				printResult(*hd, *hdprefix, *hdsuffix, f, err)
 				numfails++
 			}
@@ -60,11 +59,11 @@ func main() {
 
 		}
 	} else {
-		file, err := dkim.FileBuffer(dkim.NormalizeReader(os.Stdin))
+		file, err := pkg.FileBuffer(pkg.NormalizeReader(os.Stdin))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		if err := dkim.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
+		if err := pkg.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
 			printResult(*hd, *hdprefix, *hdsuffix, "<stdin>", err)
 			numfails++
 		}

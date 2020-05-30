@@ -1,4 +1,4 @@
-package dkim
+package pkg
 
 import (
 	"bytes"
@@ -7,9 +7,8 @@ import (
 	"regexp"
 )
 
-var HeaderEnd = fmt.Errorf("End of mail headers")
-
-var headerEndRE *regexp.Regexp = regexp.MustCompile("\r\n[^\t \n]")
+var HeaderEnd = fmt.Errorf("end of mail headers")
+var headerEndRE = regexp.MustCompile("\r\n[^\t \n]")
 
 func readRawHeader(r io.ReadSeeker) (raw []byte, err error) {
 	buf := make([]byte, 8192)
@@ -37,52 +36,52 @@ func readRawHeader(r io.ReadSeeker) (raw []byte, err error) {
 		// There were 2 consecutive line ends, marking the end of the
 		// header section, so seek to the start of the body after the
 		// blank line.
-		if _, err := r.Seek(int64(start)+2, io.SeekStart); err != nil {
+		if _, err := r.Seek(start+2, io.SeekStart); err != nil {
 			return nil, err
 		}
 		return nil, HeaderEnd
 	}
 	end := re[1] - 1
-	// Seek back over anything we overread, so that the next call
+	// Seek back over anything we over read, so that the next call
 	// starts at the right place.
-	if _, err := r.Seek(int64(start)+int64(end), io.SeekStart); err != nil {
+	if _, err := r.Seek(start+int64(end), io.SeekStart); err != nil {
 		return nil, err
 	}
 	return buf[:end], nil
 }
 
 func ReadSMTPHeaderSimple(r io.ReadSeeker) (raw, converted []byte, err error) {
-	rawb, err := readRawHeader(r)
-	return rawb, rawb, err
+	rawBytes, err := readRawHeader(r)
+	return rawBytes, rawBytes, err
 }
 
-var whitespaceRE *regexp.Regexp = regexp.MustCompile("[\t \n\r]+")
+var whitespaceRE = regexp.MustCompile("[\t \n\r]+")
 
 //var whitespaceRE *regexp.Regexp = regexp.MustCompile("[\t \n]+")
-var headerRE *regexp.Regexp = regexp.MustCompile("^([[:graph:]]+)[[:space:]]*:[[:space:]]*")
+var headerRE = regexp.MustCompile("^([[:graph:]]+)[[:space:]]*:[[:space:]]*")
 
-func relaxHeader(rawb []byte) []byte {
-	conv := whitespaceRE.ReplaceAll(rawb, []byte{' '})
+func relaxHeader(rawBytes []byte) []byte {
+	conv := whitespaceRE.ReplaceAll(rawBytes, []byte{' '})
 	split := headerRE.FindSubmatchIndex(conv)
 	if split == nil {
 		// This should probably be an error?
 		return conv
 	}
 
-	convheader := bytes.ToLower(conv[split[2]:split[3]])
+	convHeader := bytes.ToLower(conv[split[2]:split[3]])
 	body := bytes.TrimSpace(conv[split[1]:])
-	final := make([]byte, 0, len(convheader)+1+len(body)+2)
-	final = append(final, convheader...)
+	final := make([]byte, 0, len(convHeader)+1+len(body)+2)
+	final = append(final, convHeader...)
 	final = append(final, ':')
 	final = append(final, body...)
 	final = append(final, '\r', '\n')
 	return final
 }
 func ReadSMTPHeaderRelaxed(r io.ReadSeeker) (raw, converted []byte, err error) {
-	rawb, err := readRawHeader(r)
+	rawBytes, err := readRawHeader(r)
 	if err != nil {
 		return nil, nil, err
 	}
-	final := relaxHeader(rawb)
-	return rawb, final, err
+	final := relaxHeader(rawBytes)
+	return rawBytes, final, err
 }

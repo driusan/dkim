@@ -1,4 +1,4 @@
-package dkim
+package pkg
 
 import (
 	"bufio"
