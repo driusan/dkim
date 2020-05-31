@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"flag"
 	"fmt"
 	"github.com/driusan/dkim/pkg"
@@ -11,82 +11,83 @@ import (
 )
 
 func main() {
-	pubkey := flag.String("txt", "", "Use argument file as DNS TXT entry instead of looking it up")
-	hd := flag.String("hd", "", "Print the results to an SMTP header on stdout instead of stderr")
-	hdprefix := flag.String("hdprefix", "", "Prefix the results of the header with this string")
-	hdsuffix := flag.String("hdsuffix", "", "Suffix the results of the header with this string")
+	var pubKey, hd, headerPrefix, headerSuffix string
+	flag.StringVar(&pubKey, "txt", "", "Use argument file as DNS TXT entry instead of looking it up")
+	flag.StringVar(&hd, "hd", "", "Print the results to an SMTP header on stdout instead of stderr")
+	flag.StringVar(&headerPrefix, "hdprefix", "", "Prefix the results of the header with this string")
+	flag.StringVar(&headerSuffix, "hdsuffix", "", "Suffix the results of the header with this string")
 	flag.Parse()
 
-	var key *rsa.PublicKey
-	if *pubkey != "" {
-		keybytes, err := ioutil.ReadFile(*pubkey)
+	var key crypto.PublicKey
+	if pubKey != "" {
+		keyBytes, err := ioutil.ReadFile(pubKey)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		dkey, err := pkg.DecodeDNSTXT(string(keybytes))
+		domainKey, err := pkg.DecodeDNSTXT(string(keyBytes))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		key = dkey
+		key = domainKey
 	}
 	var files []string
 	if args := flag.Args(); len(args) > 0 {
 		files = args
 	}
-	var numfails int
+	var numFailures int
 	if len(files) > 0 {
 		for _, f := range files {
 			fd, err := os.Open(f)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				_, _ = fmt.Fprintln(os.Stderr, err)
 			}
 			file, err := pkg.FileBuffer(pkg.NormalizeReader(fd))
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				_, _ = fmt.Fprintln(os.Stderr, err)
 			}
 
-			if err := pkg.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
-				printResult(*hd, *hdprefix, *hdsuffix, f, err)
-				numfails++
+			if err := pkg.VerifyWithPublicKey(file, key); err != nil || hd != "" {
+				printResult(hd, headerPrefix, headerSuffix, f, err)
+				numFailures++
 			}
 			file.Close()
 			fd.Close()
 			if err := os.Remove(file.Name()); err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				_, _ = fmt.Fprintln(os.Stderr, err)
 			}
 
 		}
 	} else {
 		file, err := pkg.FileBuffer(pkg.NormalizeReader(os.Stdin))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 		}
-		if err := pkg.VerifyWithPublicKey(file, key); err != nil || *hd != "" {
-			printResult(*hd, *hdprefix, *hdsuffix, "<stdin>", err)
-			numfails++
+		if err := pkg.VerifyWithPublicKey(file, key); err != nil || hd != "" {
+			printResult(hd, headerPrefix, headerSuffix, "<stdin>", err)
+			numFailures++
 		}
 		if err := os.Remove(file.Name()); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 		}
 
 	}
-	os.Exit(numfails)
+	os.Exit(numFailures)
 }
 
 // Helper to print the results for either stdin or per file.
-func printResult(hd, hdprefix, hdsuffix string, filename string, err error) {
+func printResult(hd, headerPrefix string, headerSuffix string, filename string, err error) {
 	if hd != "" {
 		if err == nil {
-			fmt.Printf("%v: %vPass%v\n", hd, hdprefix, hdsuffix)
-		} else if errstr := err.Error(); errstr == "Permanent failure: no DKIM signature" || strings.Index(errstr, "Temporary failure") >= 0 {
+			fmt.Printf("%v: %vPass%v\n", hd, headerPrefix, headerSuffix)
+		} else if errorString := err.Error(); errorString == "Permanent failure: no DKIM signature" || strings.Index(errorString, "Temporary failure") >= 0 {
 			// Nothing
 		} else {
-			fmt.Printf("%v: %vFail%v\n", hd, hdprefix, hdsuffix)
+			fmt.Printf("%v: %vFail%v\n", hd, headerPrefix, headerSuffix)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "%v: %v\n", filename, err)
+		_, _ = fmt.Fprintf(os.Stderr, "%v: %v\n", filename, err)
 	}
 
 }

@@ -3,6 +3,8 @@ package pkg
 import (
 	"bufio"
 	"bytes"
+	"crypto/ed25519"
+	"crypto/x509"
 	"fmt"
 	"github.com/driusan/dkim/pkg/algorithms"
 	"io"
@@ -11,10 +13,8 @@ import (
 	"encoding/base64"
 
 	"crypto"
-	"crypto/rsa"
-	"crypto/sha1"
+	_ "crypto/ed25519"
 	"crypto/sha256"
-	"crypto/x509"
 	"regexp"
 	"strconv"
 	"strings"
@@ -251,7 +251,7 @@ func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimHead
 
 var bRE = regexp.MustCompile("b=.+($|;)")
 
-func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key crypto.PrivateKey, nl string) error {
 	if nl != "\n" {
 		nl = "\r\n"
 	}
@@ -269,7 +269,7 @@ func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateK
 // SignMessage signs the message in r with the signature parameters from s and
 // the private key key, writing the result with the added DKIM-Signature to
 // dst.
-func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key crypto.PrivateKey, nl string) error {
 	if nl != "\n" {
 		nl = "\r\n"
 	}
@@ -307,27 +307,15 @@ func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKe
 
 // signDKIMMessage signs a message that has already been canonicalized according
 // to the DKIM standard.
-func signDKIMMessage(message, dkimSignature []byte, algorithm algorithms.Algorithm, key *rsa.PrivateKey) (b string, err error) {
+func signDKIMMessage(message, dkimSignature []byte, algorithm algorithms.Algorithm, key crypto.PrivateKey) (b string, err error) {
 	dkimSignature = bRE.ReplaceAll(dkimSignature, []byte{'b', '='})
 	message = append(message, dkimSignature...)
-	switch algorithm.Name() {
-		case "rsa-sha256", "sha256":
-			hash := sha256.Sum256(message)
-			v, err := rsa.SignPKCS1v15(nil, key, crypto.SHA256, hash[:])
-			if err != nil {
-				return "", err
-			}
-			return base64.StdEncoding.EncodeToString(v), nil
 
-		case "rsa-sha1", "sha1":
-			hash := sha1.Sum(message)
-			v, err := rsa.SignPKCS1v15(nil, key, crypto.SHA1, hash[:])
-			if err != nil {
-				return "", err
-			}
-			return base64.StdEncoding.EncodeToString(v), nil
+	if algorithm == nil {
+		return "", fmt.Errorf("permanent failure: unknown algorithm")
 	}
-	return "", fmt.Errorf("permanent failure: unknown algorithm")
+
+	return algorithm.Sign(message, key)
 }
 
 // dkimVerify verifies that a message verifies with header of dkimsig and a
@@ -363,7 +351,7 @@ func dkimVerify(message, dkimSignature []byte, sig []byte, algorithm algorithms.
 
 // VerifyWithPublicKey verifies a reader r, but uses the passed public key
 // instead of trying to extract the key from the DNS.
-func VerifyWithPublicKey(r io.ReadSeeker, key *crypto.PublicKey) error {
+func VerifyWithPublicKey(r io.ReadSeeker, key crypto.PublicKey) error {
 	sig, msg, signatureHead, err := signatureBase(r, nil)
 	if err != nil {
 		return err
@@ -388,25 +376,36 @@ func Verify(r io.ReadSeeker) error {
 	return VerifyWithPublicKey(r, nil)
 }
 
-func DecodeDNSTXT(txt string) (*crypto.PublicKey, error) {
+func DecodeDNSTXT(txt string) (crypto.PublicKey, error) {
+	dkim := map[string]string{}
+
 	for _, tag := range splitTags([]byte(txt)) {
-		if tag.Name == "p" {
-			decoded, err := base64.StdEncoding.DecodeString(tag.Value)
-			if err != nil {
-				continue
-			}
-			key, err := x509.ParsePKIXPublicKey(decoded)
-			if err != nil {
-				continue
-			}
-			if c, ok := key.(*crypto.PublicKey); ok {
-				return c, nil
-			}
-		}
+		dkim[tag.Name] = tag.Value
 	}
+
+
+	decoded, err := base64.StdEncoding.DecodeString(dkim["p"])
+	if err != nil {
+		return nil, err
+	}
+
+	switch dkim["k"] {
+	case "rsa":
+		key, err := x509.ParsePKIXPublicKey(decoded)
+		if err != nil {
+			return nil, err
+		}
+		if c, ok := key.(crypto.PublicKey); ok {
+			return c, nil
+		}
+	case "ed25519":
+		pubKey := ed25519.PublicKey(decoded)
+		return pubKey, nil
+	}
+
 	return nil, fmt.Errorf("no key found")
 }
-func lookupKeyFromDNS(loc string) (*crypto.PublicKey, error) {
+func lookupKeyFromDNS(loc string) (crypto.PublicKey, error) {
 	txt, err := net.LookupTXT(loc)
 	if err != nil {
 		return nil, fmt.Errorf("Temporary failure: %v", err)

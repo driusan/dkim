@@ -1,19 +1,19 @@
 package main
 
 import (
+	"crypto"
 	"flag"
 	"fmt"
 	"github.com/driusan/dkim/pkg"
+	"github.com/driusan/dkim/pkg/algorithms"
 	"io/ioutil"
 	"os"
 	"strings"
 
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/pem"
 )
 
-func signMessage(sig pkg.Signature, key *rsa.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
+func signMessage(sig pkg.Signature, key crypto.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
 	r := pkg.NormalizeReader(os.Stdin)
 	if dotstuffed {
 		r.Unstuff()
@@ -36,11 +36,12 @@ func signMessage(sig pkg.Signature, key *rsa.PrivateKey, unix bool, dotstuffed b
 
 func main() {
 	var canon = "relaxed/relaxed"
-	var s, domain string
+	var algorithmInput, s, domain string
 	var headers string
 	var unstuff, nl bool
 	var headerOnly bool
 	var privateKey string
+	flag.StringVar(&algorithmInput, "a", "rsa-sha256", "Algorithm")
 	flag.StringVar(&canon, "c", "relaxed/relaxed", "Canonicalization scheme")
 	flag.StringVar(&s, "s", "", "Domain selector")
 	flag.StringVar(&domain, "d", "", "Domain name")
@@ -55,12 +56,13 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, "Selector and domain are required")
 		os.Exit(1)
 	}
-	var key *rsa.PrivateKey
+
+	algorithm := algorithms.Find(algorithmInput)
+
 	kf, err := os.Open(privateKey)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Could not open private key: %v\n", err)
 		os.Exit(1)
-
 	}
 	defer kf.Close()
 	keyFile, err := ioutil.ReadAll(kf)
@@ -70,17 +72,8 @@ func main() {
 	}
 
 	pemBlock, _ := pem.Decode(keyFile)
-	if pemBlock == nil || pemBlock.Type != "RSA PRIVATE KEY" {
-		_, _ = fmt.Fprintln(os.Stderr, "Could read private key or unsupported format")
-		os.Exit(1)
-	}
-	key, err = x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Could not parse private key: %v\n", err)
-		os.Exit(1)
-	}
-
-	sig, err := pkg.NewSignature(canon, s, domain, strings.Split(headers, ":"))
+	key, err := algorithm.ParsePrivateKey(pemBlock)
+	sig, err := pkg.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
 
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)

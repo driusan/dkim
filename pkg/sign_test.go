@@ -1,8 +1,10 @@
 package pkg
 
 import (
+	ed255192 "crypto/ed25519"
 	"crypto/rsa"
 	"github.com/driusan/dkim/pkg/algorithms"
+	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"strings"
 	"testing"
@@ -60,7 +62,49 @@ func TestMessageSigningRSASha256(t *testing.T) {
 	}
 }
 
-func TestMessageSigningEd25519(t *testing.T) {
+func TestEd25519Sha256DKIM(t *testing.T) {
+	const messageContent = `From: Joe SixPack <joe@football.example.com>
+To: Suzie Q <suzie@shopping.example.net>
+Subject: Is dinner ready?
+Date: Fri, 11 Jul 2003 21:00:37 -0700 (PDT)
+Message-ID: <20030712040037.46341.5F8J@football.example.com>
+DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed;
+    d=football.example.com; i=@football.example.com;
+    q=dns/txt; s=brisbane; t=1528637909; h=from : to :
+    subject : date : message-id : from : subject : date;
+    bh=2jUSOH9NhtVGCQWNr9BrIAPreKQjO6Sn7XIkfJVOzv8=;
+    b=/gCrinpcQOoIfuHNQIbq4pgh9kyIK3AQUdt9OdqQehSwhEIug4D11Bus
+    Fa3bT3FY5OsU7ZbnKELq+eXdp1Q1Dw==
+
+Hi.
+
+We lost the game.  Are you hungry yet?
+
+Joe.
+`
+
+	const dkimDNSRecord = `v=DKIM1; k=ed25519; p=11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=`
+
+	r, err := FileBuffer(NormalizeReader(strings.NewReader(messageContent)))
+	sig, msg, signHead, err := signatureBase(r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(r.Name()); err != nil {
+		t.Error(err)
+	}
+
+	pubKey, err := DecodeDNSTXT(dkimDNSRecord)
+	assert.Nil(t, err)
+	assert.Equal(t, "ed25519-sha256", sig.Algorithm)
+	algorithm := algorithms.Find(sig.Algorithm)
+
+	if err := dkimVerify(msg, signHead, sig.Sig(), algorithm, pubKey); err != nil {
+		t.Fatalf("Could not re-verify signed message: %v", err)
+	}
+}
+
+func TestMessageSigningEd25519Sha256(t *testing.T) {
 	r, err := FileBuffer(NormalizeReader(strings.NewReader(EmailBody)))
 	if err != nil {
 		t.Fatal(err)
@@ -85,16 +129,16 @@ func TestMessageSigningEd25519(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	key, err := rsa.GenerateKey(rand.New(rand.NewSource(0)), 512)
+	pubKey, privKey, err := ed255192.GenerateKey(rand.New(rand.NewSource(0)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := signDKIMMessage(msg, signatureHead, algorithms.RSASha256, key)
+	b, err := signDKIMMessage(msg, signatureHead, algorithms.Ed25519Sha256, privKey)
 	if err != nil {
 		t.Error(err)
 	}
 	s.Body = b
-	if err := dkimVerify(msg, signatureHead, s.Sig(), algorithms.RSASha256, &key.PublicKey); err != nil {
+	if err := dkimVerify(msg, signatureHead, s.Sig(), algorithms.Ed25519Sha256, pubKey); err != nil {
 		t.Fatalf("Could not re-verify signed message: %v", err)
 	}
 }
