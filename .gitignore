@@ -1,3 +1,7 @@
 .idea/
+.vscode/
 *.pem
 dns.txt
+dkimkeygen
+dkimsign
+dkimverify
