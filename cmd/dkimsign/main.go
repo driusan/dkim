@@ -58,6 +58,10 @@ func main() {
 	}
 
 	algorithm := algorithms.Find(algorithmInput)
+	if algorithm == nil {
+		_, _ = fmt.Fprintf(os.Stderr, "invalid algorithm selected: %s does not exist\n", algorithmInput)
+		os.Exit(1)
+	}
 
 	kf, err := os.Open(privateKey)
 	if err != nil {
