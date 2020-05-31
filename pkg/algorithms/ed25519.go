@@ -96,7 +96,7 @@ func parsePrivKeyEd25519(pemBlock *pem.Block) (crypto.PrivateKey, error) {
 		_, _ = fmt.Fprintln(os.Stderr, "Could read private key or unsupported format")
 		os.Exit(1)
 	}
-	key, err := x509.ParseECPrivateKey(pemBlock.Bytes)
+	key, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Could not parse private key: %v\n", err)
 		os.Exit(1)
