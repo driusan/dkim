@@ -77,6 +77,10 @@ func main() {
 
 	pemBlock, _ := pem.Decode(keyFile)
 	key, err := algorithm.ParsePrivateKey(pemBlock)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	sig, err := pkg.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
 
 	if err != nil {
