@@ -3,6 +3,7 @@ package pkg
 import (
 	ed255192 "crypto/ed25519"
 	"crypto/rsa"
+	"encoding/base64"
 	"github.com/driusan/dkim/pkg/algorithms"
 	"github.com/stretchr/testify/assert"
 	"math/rand"
@@ -143,3 +144,16 @@ func TestMessageSigningEd25519Sha256(t *testing.T) {
 	}
 }
 
+func TestDNSRecord1(t *testing.T){
+	const rfc  = `v=DKIM1; k=ed25519; p=11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=`
+	pubKey, err := DecodeDNSTXT(rfc)
+	assert.Nil(t, err)
+	ed255192PubKey := pubKey.(ed255192.PublicKey)
+	assert.Equal(t, base64.StdEncoding.EncodeToString(ed255192PubKey), `11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=`)
+
+	const mine = `v=DKIM1; k=ed25519; p=B8MDQdyVkX4sFJ1MIk7XRyH39grXCF5SKkaietDfeSI=`
+	pubKey, err = DecodeDNSTXT(mine)
+	assert.Nil(t, err)
+	ed255192PubKey = pubKey.(ed255192.PublicKey)
+	assert.Equal(t, base64.StdEncoding.EncodeToString(ed255192PubKey), `B8MDQdyVkX4sFJ1MIk7XRyH39grXCF5SKkaietDfeSI=`)
+}
