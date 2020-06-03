@@ -1,4 +1,4 @@
-package pkg
+package dkim
 
 import (
 	ed255192 "crypto/ed25519"

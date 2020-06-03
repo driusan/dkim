@@ -1,4 +1,4 @@
-package pkg
+package dkim
 
 import (
 	"github.com/stretchr/testify/assert"
