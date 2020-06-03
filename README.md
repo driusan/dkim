@@ -4,17 +4,22 @@
 
 A pure Go implementation of DKIM tools, originally written by
 [driusan](https://github.com/driusan) to perform DKIM signatures on
-email messages and verify them. These tools are fairly easly incorporable
+email messages and verify them. These tools are fairly easily incorporable
 into any pipeline that can pass messages along stdin and read them from stdout.
 
-[@driusan](https://github.com/driusan) is using them in front of his
-9front mail server, [@denysvitali](https://github.com/denysvitali) is
+
+### Used by
+- [@driusan](https://github.com/driusan) uses this toolset in front of his
+9front mail server
+- [@denysvitali](https://github.com/denysvitali) is
 using them in front of his [dockerized](https://github.com/denysvitali/docker-chasquid) [chasquid](https://blitiri.com.ar/p/chasquid/docs/)
 SMTP server.
+- [@SaulDoesCode](https://github.com/SaulDoesCode/mailyak) is using it as part of his [mailyak](https://github.com/SaulDoesCode/mailyak)
+mail library for the part of mail signing.
 
 ## Supported algorithms
 
-Currently the following algorithms are supported:
+Currently, DKIM supports the following signing algorithms:
 
 - `rsa-sha256`
 - `rsa-sha1`
@@ -33,8 +38,9 @@ make
 
 ### Description
 The tool `dkimkeygen` creates a Private Key / Public Key
-combination, in the form of a `privkey.pem` file and a `dns.txt` DNS
-record.
+combination for signing, in the form of a `privkey.pem` file and a `dns.txt` DNS
+record. The `dns.txt` file contains the TXT record to add to your domain, and the
+`privkey.pem` is the private key to use for signing, which should be kept somewhere safe.
 
 ### Usage
 ```
