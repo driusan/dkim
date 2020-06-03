@@ -2,7 +2,7 @@ package algorithms
 
 import (
 	"crypto"
-	ed255192 "crypto/ed25519"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
@@ -14,6 +14,12 @@ import (
 	"os"
 )
 
+var _ Algorithm = &ed25519Sha256{}
+
+var Ed25519Sha256 Algorithm = &ed25519Sha256{
+	hashingAlgorithm: sha256.New(),
+}
+
 type ed25519Sha256 struct {
 	hashingAlgorithm hash.Hash
 }
@@ -23,7 +29,7 @@ func (e *ed25519Sha256) ExportPublicKeyBytes(key crypto.PublicKey) (error, []byt
 }
 
 func exportPublicKeyBytesEd25519(key crypto.PublicKey) (error, []byte) {
-	ed25519PubKey := key.(ed255192.PublicKey)
+	ed25519PubKey := key.(ed25519.PublicKey)
 	return nil, ed25519PubKey
 }
 
@@ -32,8 +38,8 @@ func (e *ed25519Sha256) BaseName() string {
 }
 
 func (e *ed25519Sha256) ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Block) {
-	ed255192PrivKey := key.(ed255192.PrivateKey)
-	marshalledKey, err := x509.MarshalPKCS8PrivateKey(ed255192PrivKey)
+	ed25519PrivKey := key.(ed25519.PrivateKey)
+	marshalledKey, err := x509.MarshalPKCS8PrivateKey(ed25519PrivKey)
 	if err != nil {
 		return err, nil
 	}
@@ -45,8 +51,8 @@ func (e *ed25519Sha256) ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Blo
 }
 
 func (e *ed25519Sha256) ExportPublicKey(key crypto.PublicKey) (error, *pem.Block) {
-	ed255192PubKey := key.(ed255192.PublicKey)
-	marshalledKey, err := x509.MarshalPKIXPublicKey(ed255192PubKey)
+	ed25519PubKey := key.(ed25519.PublicKey)
+	marshalledKey, err := x509.MarshalPKIXPublicKey(ed25519PubKey)
 	if err != nil {
 		return err, nil
 	}
@@ -62,7 +68,7 @@ func (e *ed25519Sha256) GenerateKey() (error, crypto.PrivateKey, crypto.PublicKe
 }
 
 func generateKeyED25519() (error, crypto.PrivateKey, crypto.PublicKey) {
-	pubKey, privKey, err := ed255192.GenerateKey(rand.Reader)
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 	return err, privKey, pubKey
 }
 
@@ -87,10 +93,6 @@ func parsePublicKeyEd25519(pemBlock *pem.Block) (crypto.PublicKey, error) {
 	return key, err
 }
 
-var Ed25519Sha256 Algorithm = &ed25519Sha256{
-	hashingAlgorithm: sha256.New(),
-}
-
 func parsePrivKeyEd25519(pemBlock *pem.Block) (crypto.PrivateKey, error) {
 	if pemBlock == nil || pemBlock.Type != "PRIVATE KEY" {
 		_, _ = fmt.Fprintln(os.Stderr, "Could read private key or unsupported format")
@@ -112,7 +114,7 @@ func (e *ed25519Sha256) Sign(message []byte, key crypto.PrivateKey) (string, err
 	e.hashingAlgorithm.Reset()
 	e.hashingAlgorithm.Write(message)
 	computedHash := e.hashingAlgorithm.Sum([]byte{})
-	v := ed255192.Sign(key.(ed255192.PrivateKey), computedHash)
+	v := ed25519.Sign(key.(ed25519.PrivateKey), computedHash)
 	return base64.StdEncoding.EncodeToString(v), nil
 }
 
@@ -120,7 +122,7 @@ func (e *ed25519Sha256) Verify(message []byte, signature []byte, key crypto.Publ
 	e.hashingAlgorithm.Reset()
 	e.hashingAlgorithm.Write(message)
 	computedHash := e.hashingAlgorithm.Sum([]byte{})
-	result := ed255192.Verify(key.(ed255192.PublicKey), computedHash[:], signature)
+	result := ed25519.Verify(key.(ed25519.PublicKey), computedHash[:], signature)
 
 	if !result {
 		return errors.New("invalid signature")
