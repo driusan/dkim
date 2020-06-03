@@ -335,18 +335,7 @@ func dkimVerify(message, dkimSignature []byte, sig []byte, algorithm algorithms.
 	if algorithm == nil {
 		return fmt.Errorf("permanent failure: unknown algorithm")
 	}
-
 	return algorithm.Verify(message, sig,  key)
-
-	//switch algorithm.Name() {
-	//case "rsa-sha256", "sha256":
-	//	hash := sha256.Sum256(message)
-	//	return rsa.VerifyPKCS1v15(key, crypto.SHA256, hash[:], sig)
-	//case "rsa-sha1", "sha1":
-	//	hash := sha1.Sum(message)
-	//	return rsa.VerifyPKCS1v15(key, crypto.SHA1, hash[:], sig)
-	//}
-
 }
 
 // VerifyWithPublicKey verifies a reader r, but uses the passed public key
