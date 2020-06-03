@@ -148,14 +148,14 @@ func (r rsaSha1) ParsePublicKey(block *pem.Block) (crypto.PublicKey, error) {
 func (r *rsaSha256) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
 	r.hashingAlgorithm.Reset()
 	r.hashingAlgorithm.Write(message)
-	computedHash := r.hashingAlgorithm.Sum([]byte{})
+	computedHash := r.hashingAlgorithm.Sum(nil)
 	return rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA256, computedHash[:], signature)
 }
 
 func (r rsaSha1) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
 	r.hashingAlgorithm.Reset()
 	r.hashingAlgorithm.Write(message)
-	computedHash := r.hashingAlgorithm.Sum([]byte{})
+	computedHash := r.hashingAlgorithm.Sum(nil)
 	return rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA1, computedHash[:], signature)
 }
 
@@ -166,7 +166,7 @@ func (r rsaSha1) Name() string {
 func (r rsaSha1) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	r.hashingAlgorithm.Reset()
 	r.hashingAlgorithm.Write(message)
-	computedHash := r.hashingAlgorithm.Sum([]byte{})
+	computedHash := r.hashingAlgorithm.Sum(nil)
 	v, err := rsa.SignPKCS1v15(nil, key.(*rsa.PrivateKey), crypto.SHA1, computedHash[:])
 	if err != nil {
 		return "", err
@@ -181,7 +181,7 @@ func (*rsaSha256) Name() string {
 func (r *rsaSha256) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	r.hashingAlgorithm.Reset()
 	r.hashingAlgorithm.Write(message)
-	computedHash := r.hashingAlgorithm.Sum([]byte{})
+	computedHash := r.hashingAlgorithm.Sum(nil)
 	v, err := rsa.SignPKCS1v15(nil, key.(*rsa.PrivateKey), crypto.SHA256, computedHash[:])
 	if err != nil {
 		return "", err

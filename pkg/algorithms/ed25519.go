@@ -113,7 +113,7 @@ func (e *ed25519Sha256) Name() string {
 func (e *ed25519Sha256) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	e.hashingAlgorithm.Reset()
 	e.hashingAlgorithm.Write(message)
-	computedHash := e.hashingAlgorithm.Sum([]byte{})
+	computedHash := e.hashingAlgorithm.Sum(nil)
 	v := ed25519.Sign(key.(ed25519.PrivateKey), computedHash)
 	return base64.StdEncoding.EncodeToString(v), nil
 }
@@ -121,7 +121,7 @@ func (e *ed25519Sha256) Sign(message []byte, key crypto.PrivateKey) (string, err
 func (e *ed25519Sha256) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
 	e.hashingAlgorithm.Reset()
 	e.hashingAlgorithm.Write(message)
-	computedHash := e.hashingAlgorithm.Sum([]byte{})
+	computedHash := e.hashingAlgorithm.Sum(nil)
 	result := ed25519.Verify(key.(ed25519.PublicKey), computedHash[:], signature)
 
 	if !result {
