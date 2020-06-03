@@ -2,6 +2,6 @@
 .vscode/
 *.pem
 dns.txt
-dkimkeygen
-dkimsign
-dkimverify
+/dkimkeygen
+/dkimsign
+/dkimverify
