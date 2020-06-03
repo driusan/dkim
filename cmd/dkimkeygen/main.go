@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/driusan/dkim/pkg/algorithms"
+	"log"
 	"os"
 
 	"encoding/base64"
@@ -18,19 +19,16 @@ func main() {
 	flag.Parse()
 
 	if outputPath == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "invalid output path")
-		os.Exit(1)
+		log.Fatal("invalid output path")
 	}
 
 	if dnsOutputPath == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "invalid DNS output path")
-		os.Exit(1)
+		log.Fatal( "invalid DNS output path")
 	}
 
 	algorithm := algorithms.Find(algorithmInput)
 	if algorithm == nil {
-		_, _ = fmt.Fprintf(os.Stderr, "invalid algorithm provided, %s does not exist\n", algorithmInput)
-		os.Exit(1)
+		log.Fatalf("invalid algorithm provided, %s does not exist\n", algorithmInput)
 	}
 	err, privKey, pubKey := algorithm.GenerateKey()
 	if err != nil {

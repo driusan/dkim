@@ -7,6 +7,7 @@ import (
 	"github.com/driusan/dkim/pkg"
 	"github.com/driusan/dkim/pkg/algorithms"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
@@ -53,39 +54,33 @@ func main() {
 	flag.Parse()
 
 	if domain == "" || s == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "Selector and domain are required")
-		os.Exit(1)
+		log.Fatalln("Selector and domain are required")
 	}
 
 	algorithm := algorithms.Find(algorithmInput)
 	if algorithm == nil {
-		_, _ = fmt.Fprintf(os.Stderr, "invalid algorithm selected: %s does not exist\n", algorithmInput)
-		os.Exit(1)
+		log.Fatalf( "invalid algorithm selected: %s does not exist\n", algorithmInput)
 	}
 
 	kf, err := os.Open(privateKey)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Could not open private key: %v\n", err)
-		os.Exit(1)
+		log.Fatalf( "Could not open private key: %v\n", err)
 	}
 	defer kf.Close()
 	keyFile, err := ioutil.ReadAll(kf)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Could read private key: %v\n", err)
-		os.Exit(1)
+		log.Fatalf( "Could read private key: %v\n", err)
 	}
 
 	pemBlock, _ := pem.Decode(keyFile)
 	key, err := algorithm.ParsePrivateKey(pemBlock)
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 	sig, err := pkg.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
 
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
 	if err := signMessage(sig, key, nl, unstuff, headerOnly); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
