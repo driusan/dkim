@@ -19,7 +19,7 @@ type rsaSha256 struct {
 	hashingAlgorithm hash.Hash
 }
 
-func (r *rsaSha256) ExportPublicKeyBytes(key crypto.PublicKey) (error, []byte) {
+func (r *rsaSha256) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 	return exportPublicKeyBytesRSA(key)
 }
 
@@ -27,43 +27,43 @@ func (r *rsaSha256) BaseName() string {
 	return "rsa"
 }
 
-func (r *rsaSha256) ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Block) {
+func (r *rsaSha256) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
 	return exportPrivateKeyRSA(key)
 }
 
-func (r *rsaSha256) ExportPublicKey(key crypto.PublicKey) (error, *pem.Block) {
+func (r *rsaSha256) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
 	return exportPublicKeyRSA(key)
 }
 
-func exportPublicKeyRSA(key crypto.PublicKey) (error, *pem.Block) {
+func exportPublicKeyRSA(key crypto.PublicKey) (*pem.Block, error) {
 	rsaPublicKey := key.(rsa.PublicKey)
-	return nil, &pem.Block{
+	return &pem.Block{
 		Type:    "RSA PUBLIC KEY",
 		Headers: nil,
 		Bytes:   x509.MarshalPKCS1PublicKey(&rsaPublicKey),
-	}
+	}, nil
 }
 
-func exportPrivateKeyRSA(key crypto.PublicKey) (error, *pem.Block) {
+func exportPrivateKeyRSA(key crypto.PublicKey) (*pem.Block, error) {
 	rsaPrivateKey := key.(rsa.PrivateKey)
-	return nil, &pem.Block{
+	return &pem.Block{
 		Type:    "RSA PRIVATE KEY",
 		Headers: nil,
 		Bytes:   x509.MarshalPKCS1PrivateKey(&rsaPrivateKey),
-	}
+	}, nil
 }
 
-func (r *rsaSha256) GenerateKey() (error, crypto.PrivateKey, crypto.PublicKey) {
+func (r *rsaSha256) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
 	return generateKeyRSA()
 }
 
-func generateKeyRSA() (error, crypto.PrivateKey, crypto.PublicKey) {
+func generateKeyRSA() (crypto.PrivateKey, crypto.PublicKey, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return err, nil, nil
+		return nil, nil, err
 	}
 
-	return nil, *privateKey, privateKey.PublicKey
+	return *privateKey, privateKey.PublicKey, nil
 }
 
 func parsePrivateKeyRSA(pemBlock *pem.Block) (crypto.PrivateKey, error) {
@@ -112,28 +112,28 @@ type rsaSha1 struct {
 	hashingAlgorithm hash.Hash
 }
 
-func (r rsaSha1) ExportPublicKeyBytes(key crypto.PublicKey) (error, []byte) {
+func (r rsaSha1) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 	return exportPublicKeyBytesRSA(key)
 }
 
-func exportPublicKeyBytesRSA(key crypto.PublicKey) (error, []byte) {
+func exportPublicKeyBytesRSA(key crypto.PublicKey) ([]byte, error) {
 	rsaPublicKey := key.(rsa.PublicKey)
-	return nil, x509.MarshalPKCS1PublicKey(&rsaPublicKey)
+	return x509.MarshalPKCS1PublicKey(&rsaPublicKey), nil
 }
 
 func (r rsaSha1) BaseName() string {
 	return "rsa"
 }
 
-func (r rsaSha1) ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Block) {
+func (r rsaSha1) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
 	return exportPrivateKeyRSA(key)
 }
 
-func (r rsaSha1) ExportPublicKey(key crypto.PublicKey) (error, *pem.Block) {
+func (r rsaSha1) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
 	return exportPublicKeyRSA(key)
 }
 
-func (r rsaSha1) GenerateKey() (error, crypto.PrivateKey, crypto.PublicKey) {
+func (r rsaSha1) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
 	return generateKeyRSA()
 }
 

@@ -12,10 +12,10 @@ type Algorithm interface {
 	Verify(message []byte, signature []byte, key crypto.PublicKey) error
 	ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error)
 	ParsePublicKey(block *pem.Block) (crypto.PublicKey, error)
-	ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Block)
-	ExportPublicKey(key crypto.PublicKey) (error, *pem.Block)
-	ExportPublicKeyBytes(key crypto.PublicKey) (error, []byte)
-	GenerateKey() (error, crypto.PrivateKey, crypto.PublicKey)
+	ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error)
+	ExportPublicKey(key crypto.PublicKey) (*pem.Block, error)
+	ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error)
+	GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error)
 }
 
 func Find(name string) Algorithm {

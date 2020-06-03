@@ -24,52 +24,51 @@ type ed25519Sha256 struct {
 	hashingAlgorithm hash.Hash
 }
 
-func (e *ed25519Sha256) ExportPublicKeyBytes(key crypto.PublicKey) (error, []byte) {
+func (e *ed25519Sha256) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 	return exportPublicKeyBytesEd25519(key)
 }
 
-func exportPublicKeyBytesEd25519(key crypto.PublicKey) (error, []byte) {
+func exportPublicKeyBytesEd25519(key crypto.PublicKey) ([]byte, error) {
 	ed25519PubKey := key.(ed25519.PublicKey)
-	return nil, ed25519PubKey
+	return ed25519PubKey, nil
 }
 
 func (e *ed25519Sha256) BaseName() string {
 	return "ed25519"
 }
 
-func (e *ed25519Sha256) ExportPrivateKey(key crypto.PrivateKey) (error, *pem.Block) {
+func (e *ed25519Sha256) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
 	ed25519PrivKey := key.(ed25519.PrivateKey)
 	marshalledKey, err := x509.MarshalPKCS8PrivateKey(ed25519PrivKey)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, &pem.Block{
+	return &pem.Block{
 		Type:    "PRIVATE KEY",
 		Headers: nil,
 		Bytes:   marshalledKey,
-	}
+	}, nil
 }
 
-func (e *ed25519Sha256) ExportPublicKey(key crypto.PublicKey) (error, *pem.Block) {
+func (e *ed25519Sha256) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
 	ed25519PubKey := key.(ed25519.PublicKey)
 	marshalledKey, err := x509.MarshalPKIXPublicKey(ed25519PubKey)
 	if err != nil {
-		return err, nil
+		return nil, err
 	}
-	return nil, &pem.Block{
+	return &pem.Block{
 		Type:    "PUBLIC KEY",
 		Headers: nil,
 		Bytes:   marshalledKey,
-	}
+	}, err
 }
 
-func (e *ed25519Sha256) GenerateKey() (error, crypto.PrivateKey, crypto.PublicKey) {
+func (e *ed25519Sha256) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
 	return generateKeyED25519()
 }
 
-func generateKeyED25519() (error, crypto.PrivateKey, crypto.PublicKey) {
-	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
-	return err, privKey, pubKey
+func generateKeyED25519() (crypto.PrivateKey, crypto.PublicKey, error) {
+	return ed25519.GenerateKey(rand.Reader)
 }
 
 func (e *ed25519Sha256) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
