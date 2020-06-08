@@ -30,19 +30,19 @@ func main() {
 	if algorithm == nil {
 		log.Fatalf("invalid algorithm provided, %s does not exist\n", algorithmInput)
 	}
-	err, privKey, pubKey := algorithm.GenerateKey()
+	privKey, pubKey, err := algorithm.GenerateKey()
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 
-	err, privKeyPem := algorithm.ExportPrivateKey(privKey)
+	privKeyPem, err := algorithm.ExportPrivateKey(privKey)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
 
-	err, pubKeyBytes := algorithm.ExportPublicKeyBytes(pubKey)
+	pubKeyBytes, err := algorithm.ExportPublicKeyBytes(pubKey)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)

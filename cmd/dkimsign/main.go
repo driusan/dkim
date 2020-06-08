@@ -14,12 +14,12 @@ import (
 	"encoding/pem"
 )
 
-func signMessage(sig pkg.Signature, key crypto.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
-	r := pkg.NormalizeReader(os.Stdin)
+func signMessage(sig dkim.Signature, key crypto.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
+	r := dkim.NormalizeReader(os.Stdin)
 	if dotstuffed {
 		r.Unstuff()
 	}
-	file, err := pkg.FileBuffer(r)
+	file, err := dkim.FileBuffer(r)
 	if err != nil {
 		return err
 	}
@@ -30,9 +30,9 @@ func signMessage(sig pkg.Signature, key crypto.PrivateKey, unix bool, dotstuffed
 		nl = "\n"
 	}
 	if hdronly {
-		return pkg.SignedHeader(sig, file, os.Stdout, key, nl)
+		return dkim.SignedHeader(sig, file, os.Stdout, key, nl)
 	}
-	return pkg.SignMessage(sig, file, os.Stdout, key, nl)
+	return dkim.SignMessage(sig, file, os.Stdout, key, nl)
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	sig, err := pkg.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
+	sig, err := dkim.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
 
 	if err != nil {
 		log.Fatalln(err)
