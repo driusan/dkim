@@ -14,25 +14,34 @@ import (
 	"os"
 )
 
-type rsaSha256 struct {
+type RsaSha256 struct {
 	key              *rsa.PrivateKey
+	bits             int
 	hashingAlgorithm hash.Hash
 }
 
-func (r *rsaSha256) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
+func (r *RsaSha256) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 	return exportPublicKeyBytesRSA(key)
 }
 
-func (r *rsaSha256) BaseName() string {
+func (r *RsaSha256) BaseName() string {
 	return "rsa"
 }
 
-func (r *rsaSha256) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
+func (r *RsaSha256) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
 	return exportPrivateKeyRSA(key)
 }
 
-func (r *rsaSha256) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
+func (r *RsaSha256) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
 	return exportPublicKeyRSA(key)
+}
+
+func (r *RsaSha256) SetKeySize(bits int) {
+	r.bits = bits
+}
+
+func (r *RsaSha1) SetKeySize(bits int) {
+	r.bits = bits
 }
 
 func exportPublicKeyRSA(key crypto.PublicKey) (*pem.Block, error) {
@@ -53,12 +62,12 @@ func exportPrivateKeyRSA(key crypto.PublicKey) (*pem.Block, error) {
 	}, nil
 }
 
-func (r *rsaSha256) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
-	return generateKeyRSA()
+func (r *RsaSha256) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
+	return generateKeyRSA(r.bits)
 }
 
-func generateKeyRSA() (crypto.PrivateKey, crypto.PublicKey, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+func generateKeyRSA(bits int) (crypto.PrivateKey, crypto.PublicKey, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -92,27 +101,30 @@ func parsePublicKeyRSA(pemBlock *pem.Block) (crypto.PublicKey, error) {
 	return key, err
 }
 
-func (r *rsaSha256) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
+func (r *RsaSha256) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
 	return parsePrivateKeyRSA(block)
 }
 
-func (r *rsaSha256) ParsePublicKey(block *pem.Block) (crypto.PublicKey, error) {
+func (r *RsaSha256) ParsePublicKey(block *pem.Block) (crypto.PublicKey, error) {
 	return parsePublicKeyRSA(block)
 }
 
-var RSASha256 Algorithm = &rsaSha256{
+var RSASha256 Algorithm = &RsaSha256{
 	hashingAlgorithm: sha256.New(),
+	bits:             2048,
 }
-var RSASha1 Algorithm = &rsaSha1{
+var RSASha1 Algorithm = &RsaSha1{
 	hashingAlgorithm: sha1.New(),
+	bits:             2048,
 }
 
-type rsaSha1 struct {
+type RsaSha1 struct {
 	key              *rsa.PrivateKey
 	hashingAlgorithm hash.Hash
+	bits             int
 }
 
-func (r rsaSha1) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
+func (r RsaSha1) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 	return exportPublicKeyBytesRSA(key)
 }
 
@@ -121,31 +133,31 @@ func exportPublicKeyBytesRSA(key crypto.PublicKey) ([]byte, error) {
 	return x509.MarshalPKCS1PublicKey(&rsaPublicKey), nil
 }
 
-func (r rsaSha1) BaseName() string {
+func (r RsaSha1) BaseName() string {
 	return "rsa"
 }
 
-func (r rsaSha1) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
+func (r RsaSha1) ExportPrivateKey(key crypto.PrivateKey) (*pem.Block, error) {
 	return exportPrivateKeyRSA(key)
 }
 
-func (r rsaSha1) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
+func (r RsaSha1) ExportPublicKey(key crypto.PublicKey) (*pem.Block, error) {
 	return exportPublicKeyRSA(key)
 }
 
-func (r rsaSha1) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
-	return generateKeyRSA()
+func (r RsaSha1) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, error) {
+	return generateKeyRSA(r.bits)
 }
 
-func (r rsaSha1) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
+func (r RsaSha1) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
 	return parsePrivateKeyRSA(block)
 }
 
-func (r rsaSha1) ParsePublicKey(block *pem.Block) (crypto.PublicKey, error) {
+func (r RsaSha1) ParsePublicKey(block *pem.Block) (crypto.PublicKey, error) {
 	return parsePublicKeyRSA(block)
 }
 
-func (r *rsaSha256) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
+func (r *RsaSha256) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
 	r.hashingAlgorithm.Reset()
 	if _, err := r.hashingAlgorithm.Write(message); err != nil {
 		return err
@@ -154,7 +166,7 @@ func (r *rsaSha256) Verify(message []byte, signature []byte, key crypto.PublicKe
 	return rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA256, computedHash[:], signature)
 }
 
-func (r rsaSha1) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
+func (r RsaSha1) Verify(message []byte, signature []byte, key crypto.PublicKey) error {
 	r.hashingAlgorithm.Reset()
 	if _, err := r.hashingAlgorithm.Write(message); err != nil {
 		return err
@@ -163,11 +175,11 @@ func (r rsaSha1) Verify(message []byte, signature []byte, key crypto.PublicKey) 
 	return rsa.VerifyPKCS1v15(key.(*rsa.PublicKey), crypto.SHA1, computedHash[:], signature)
 }
 
-func (r rsaSha1) Name() string {
+func (r RsaSha1) Name() string {
 	return "rsa-sha1"
 }
 
-func (r rsaSha1) Sign(message []byte, key crypto.PrivateKey) (string, error) {
+func (r RsaSha1) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	r.hashingAlgorithm.Reset()
 	if _, err := r.hashingAlgorithm.Write(message); err != nil {
 		return "", err
@@ -180,11 +192,11 @@ func (r rsaSha1) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	return base64.StdEncoding.EncodeToString(v), nil
 }
 
-func (*rsaSha256) Name() string {
+func (*RsaSha256) Name() string {
 	return "rsa-sha256"
 }
 
-func (r *rsaSha256) Sign(message []byte, key crypto.PrivateKey) (string, error) {
+func (r *RsaSha256) Sign(message []byte, key crypto.PrivateKey) (string, error) {
 	r.hashingAlgorithm.Reset()
 	r.hashingAlgorithm.Write(message)
 	computedHash := r.hashingAlgorithm.Sum(nil)
