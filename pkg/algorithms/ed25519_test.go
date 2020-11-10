@@ -10,7 +10,7 @@ func TestEd25519Sha256_ExportPublicKey(t *testing.T) {
 	err, _, pubKey := Ed25519Sha256.GenerateKey()
 	assert.Nil(t, err)
 
-	err, pemBlock := Ed25519Sha256.ExportPublicKey(pubKey)
+	pemBlock, err := Ed25519Sha256.ExportPublicKey(pubKey)
 	assert.Nil(t, err)
 
 	parsedPublicKey, err := x509.ParsePKIXPublicKey(pemBlock.Bytes)
