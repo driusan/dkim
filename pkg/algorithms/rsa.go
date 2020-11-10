@@ -45,11 +45,14 @@ func (r *RsaSha1) SetKeySize(bits int) {
 }
 
 func exportPublicKeyRSA(key crypto.PublicKey) (*pem.Block, error) {
-	rsaPublicKey := key.(rsa.PublicKey)
+	bytes, err := x509.MarshalPKIXPublicKey(key)
+	if err != nil {
+		return nil, err
+	}
 	return &pem.Block{
-		Type:    "RSA PUBLIC KEY",
+		Type:    "PUBLIC KEY",
 		Headers: nil,
-		Bytes:   x509.MarshalPKCS1PublicKey(&rsaPublicKey),
+		Bytes:  bytes,
 	}, nil
 }
 
@@ -72,7 +75,7 @@ func generateKeyRSA(bits int) (crypto.PrivateKey, crypto.PublicKey, error) {
 		return nil, nil, err
 	}
 
-	return *privateKey, privateKey.PublicKey, nil
+	return *privateKey, privateKey.Public(), nil
 }
 
 func parsePrivateKeyRSA(pemBlock *pem.Block) (crypto.PrivateKey, error) {
@@ -129,8 +132,8 @@ func (r RsaSha1) ExportPublicKeyBytes(key crypto.PublicKey) ([]byte, error) {
 }
 
 func exportPublicKeyBytesRSA(key crypto.PublicKey) ([]byte, error) {
-	rsaPublicKey := key.(rsa.PublicKey)
-	return x509.MarshalPKCS1PublicKey(&rsaPublicKey), nil
+	rsaPublicKey := key.(*rsa.PublicKey)
+	return x509.MarshalPKIXPublicKey(rsaPublicKey)
 }
 
 func (r RsaSha1) BaseName() string {
