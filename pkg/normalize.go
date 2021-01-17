@@ -1,7 +1,6 @@
 package dkim
 
 import (
-	"regexp"
 	//	"fmt"
 	"bytes"
 	"io"
@@ -9,12 +8,10 @@ import (
 	"os"
 )
 
-var nonnormalLineRE = regexp.MustCompile("([^\r]|^)\n")
-
 // A normalizeReader wraps an io.Reader to normalize the line endings and
 // encoding of a stream of bytes.
-// It reads into a tempfile, which it deletes on close, so that it also
-// implements the seek
+// It reads them into temporary files, which will then get deleted on close, in order
+// to implement seeking
 type normalizeReader struct {
 	// The underlying reader
 	io.Reader
@@ -35,13 +32,11 @@ func (n *normalizeReader) Read(r []byte) (int, error) {
 	// If there's already enough from the last read to fill this buffer,
 	// don't bother with the read.
 	if len(n.leftOver) < len(r)/2 {
-		// There wasn't enough data, so append it to the scratch
-		// buffer
+		// There wasn't enough data, so append it to the scratch buffer
 		var j int
 		j, err = n.Reader.Read(r)
 		n.leftOver = append(n.leftOver, r[:j]...)
 		if err == io.EOF {
-			//println("EOF")
 			n.eof = true
 		}
 	}
@@ -50,7 +45,7 @@ func (n *normalizeReader) Read(r []byte) (int, error) {
 		return 0, io.EOF
 	}
 	// Replace all non-normalized lines remaining with \r\n
-	//	n.leftOver = nonnormalLineRE.ReplaceAll(n.leftOver, []byte{'$', '1', '\r', '\n'})
+	//	n.leftOver = nonNormalLineRE.ReplaceAll(n.leftOver, []byte{'$', '1', '\r', '\n'})
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\r', '\n'}, []byte{'\n'}, -1)
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\r'}, []byte{'\n'}, -1)
 	n.leftOver = bytes.Replace(n.leftOver, []byte{'\n'}, []byte{'\r', '\n'}, -1)
@@ -82,13 +77,13 @@ func (n *normalizeReader) Read(r []byte) (int, error) {
 }
 
 func FileBuffer(r io.Reader) (*os.File, error) {
-	tempfile, err := ioutil.TempFile("", "readbuffer")
+	tempFile, err := ioutil.TempFile("", "readbuffer")
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(tempfile, r)
-	tempfile.Seek(0, io.SeekStart)
-	return tempfile, err
+	_, err = io.Copy(tempFile, r)
+	_, _ = tempFile.Seek(0, io.SeekStart)
+	return tempFile, err
 }
 
 func NormalizeReader(r io.Reader) *normalizeReader {

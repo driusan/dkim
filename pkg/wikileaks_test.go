@@ -1,11 +1,9 @@
 package dkim
 
 import (
-	//"fmt"
 	"encoding/base64"
+	"github.com/driusan/dkim/pkg/algorithms"
 	"os"
-
-	"crypto/rsa"
 	"crypto/x509"
 	"strings"
 	"testing"
@@ -223,7 +221,7 @@ oon</font></span></p></div>
 `
 
 	r, err := FileBuffer(NormalizeReader(strings.NewReader(body)))
-	sig, msg, sighead, err := signatureBase(r, nil)
+	sig, msg, signHead, err := signatureBase(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,30 +230,28 @@ oon</font></span></p></div>
 	}
 
 	// Snapshot of the key from the DNS record at the time of writing this test..
-	keybytes, err := base64.StdEncoding.DecodeString("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1Kd87/UeJjenpabgbFwh+eBCsSTrqmwIYYvywlbhbqoo2DymndFkbjOVIPIldNs/m40KF+yzMn1skyoxcTUGCQs8g3FgD2Ap3ZB5DekAo5wMmk4wimDO+U8QzI3SD07y2+07wlNWwIt8svnxgdxGkVbbhzY8i+RQ9DpSVpPbF7ykQxtKXkv/ahW3KjViiAH+ghvvIhkx4xYSIc9oSwVmAl5OctMEeWUwg8Istjqz8BZeTWbf41fbNhte7Y+YqZOwq1Sd0DbvYAD9NOZK9vlfuac0598HY+vtSBczUiKERHv1yRbcaQtZFh5wtiRrN04BLUTD21MycBX5jYchHjPY/wIDAQAB")
+	keyBytes, err := base64.StdEncoding.DecodeString("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1Kd87/UeJjenpabgbFwh+eBCsSTrqmwIYYvywlbhbqoo2DymndFkbjOVIPIldNs/m40KF+yzMn1skyoxcTUGCQs8g3FgD2Ap3ZB5DekAo5wMmk4wimDO+U8QzI3SD07y2+07wlNWwIt8svnxgdxGkVbbhzY8i+RQ9DpSVpPbF7ykQxtKXkv/ahW3KjViiAH+ghvvIhkx4xYSIc9oSwVmAl5OctMEeWUwg8Istjqz8BZeTWbf41fbNhte7Y+YqZOwq1Sd0DbvYAD9NOZK9vlfuac0598HY+vtSBczUiKERHv1yRbcaQtZFh5wtiRrN04BLUTD21MycBX5jYchHjPY/wIDAQAB")
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := x509.ParsePKIXPublicKey(keybytes)
+	key, err := x509.ParsePKIXPublicKey(keyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pub, ok := key.(*rsa.PublicKey)
-	if !ok {
-		t.Fatal("Could not parse public key")
-	}
-	sighash, err := base64.StdEncoding.DecodeString(sig.Body)
+	signHash, err := base64.StdEncoding.DecodeString(sig.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := dkimVerify(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
+
+	algorithm := algorithms.Find(sig.Algorithm)
+	if err := dkimVerify(msg, signHead, signHash, algorithm, key); err != nil {
 		t.Error(err)
 	}
 
 	// Add some newlines and try again, since it's relaxed body
 	// canonicalization this should still succeed.
 	r, err = FileBuffer(NormalizeReader(strings.NewReader(body + "\r\n\r\n")))
-	sig, msg, sighead, err = signatureBase(r, nil)
+	sig, msg, signHead, err = signatureBase(r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,17 +259,17 @@ oon</font></span></p></div>
 		t.Error(err)
 	}
 
-	if err := dkimVerify(msg, sighead, sighash, sig.Algorithm, pub); err != nil {
+	if err := dkimVerify(msg, signHead, signHash, algorithm, key); err != nil {
 		t.Error(err)
 	}
 
 	// Change a random character and ensure that it fails.
 
-	bodybyte := []byte(body)
-	bodybyte[2048] = 'q'
-	r, err = FileBuffer(NormalizeReader(strings.NewReader(string(bodybyte))))
+	bodyBytes := []byte(body)
+	bodyBytes[2048] = 'q'
+	r, err = FileBuffer(NormalizeReader(strings.NewReader(string(bodyBytes))))
 
-	sig, msg, sighead, err = signatureBase(r, nil)
+	sig, msg, signHead, err = signatureBase(r, nil)
 	if err == nil {
 		t.Error("Modified body in signatureBase did not return error")
 	}
@@ -281,7 +277,7 @@ oon</font></span></p></div>
 		t.Error(err)
 	}
 
-	/*	if err := VerifyWithPublicKey(msg, sighead, sighash, sig.Algorithm, pub); err == nil {
+	/*	if err := VerifyWithPublicKey(msg, signHead, signHash, sig.Algorithm, pub); err == nil {
 		t.Error("Modified body was verified")
 	}*/
 }

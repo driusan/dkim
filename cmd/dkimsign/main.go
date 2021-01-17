@@ -1,20 +1,20 @@
 package main
 
 import (
+	"crypto"
 	"flag"
 	"fmt"
+	"github.com/driusan/dkim/pkg"
+	"github.com/driusan/dkim/pkg/algorithms"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
-	"github.com/driusan/dkim"
-
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/pem"
 )
 
-func signmessage(sig dkim.Signature, key *rsa.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
+func signMessage(sig dkim.Signature, key crypto.PrivateKey, unix bool, dotstuffed bool, hdronly bool) error {
 	r := dkim.NormalizeReader(os.Stdin)
 	if dotstuffed {
 		r.Unstuff()
@@ -36,58 +36,54 @@ func signmessage(sig dkim.Signature, key *rsa.PrivateKey, unix bool, dotstuffed 
 }
 
 func main() {
-	var canon string = "relaxed/relaxed"
-	var s, domain string
+	var canon = "relaxed/relaxed"
+	var algorithmInput, s, domain string
 	var headers string
-	var unstuff bool
-	var headeronly bool
+	var unstuff, nl bool
+	var headerOnly bool
+	var privateKey string
+	flag.StringVar(&algorithmInput, "a", "rsa-sha256", "Algorithm")
 	flag.StringVar(&canon, "c", "relaxed/relaxed", "Canonicalization scheme")
 	flag.StringVar(&s, "s", "", "Domain selector")
 	flag.StringVar(&domain, "d", "", "Domain name")
 	flag.StringVar(&headers, "h", "From:Subject:To:Date", "Colon separated list of headers to sign")
 	flag.BoolVar(&unstuff, "u", false, "Assume input is already SMTP dot stuffed when calculating signature and un dot-stuff it while printing")
-	nl := flag.Bool("n", false, `Print final message with \n instead of \r\n line endings`)
-	flag.BoolVar(&headeronly, "hd", false, "Only print the header, not the whole message after signing")
-	privatekey := flag.String("key", "", "Location of PEM encoded private key")
+	flag.BoolVar(&nl, "n", false, `Print final message with \n instead of \r\n line endings`)
+	flag.BoolVar(&headerOnly, "hd", false, "Only print the header, not the whole message after signing")
+	flag.StringVar(&privateKey, "key", "", "Location of PEM encoded private key")
 	flag.Parse()
 
 	if domain == "" || s == "" {
-		fmt.Fprintln(os.Stderr, "Selector and domain are required")
-		os.Exit(1)
+		log.Fatalln("Selector and domain are required")
 	}
-	var key *rsa.PrivateKey
-	kf, err := os.Open(*privatekey)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not open private key: %v\n", err)
-		os.Exit(1)
 
+	algorithm := algorithms.Find(algorithmInput)
+	if algorithm == nil {
+		log.Fatalf( "invalid algorithm selected: %s does not exist\n", algorithmInput)
+	}
+
+	kf, err := os.Open(privateKey)
+	if err != nil {
+		log.Fatalf( "Could not open private key: %v\n", err)
 	}
 	defer kf.Close()
-	keyfile, err := ioutil.ReadAll(kf)
+	keyFile, err := ioutil.ReadAll(kf)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could read private key: %v\n", err)
-		os.Exit(1)
+		log.Fatalf( "Could read private key: %v\n", err)
 	}
 
-	pemblock, _ := pem.Decode(keyfile)
-	if pemblock == nil || pemblock.Type != "RSA PRIVATE KEY" {
-		fmt.Fprintln(os.Stderr, "Could read private key or unsupported format")
-		os.Exit(1)
-	}
-	key, err = x509.ParsePKCS1PrivateKey(pemblock.Bytes)
+	pemBlock, _ := pem.Decode(keyFile)
+	key, err := algorithm.ParsePrivateKey(pemBlock)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not parse private key: %v\n", err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
-
-	sig, err := dkim.NewSignature(canon, s, domain, strings.Split(headers, ":"))
+	sig, err := dkim.NewSignature(canon, s, algorithm, domain, strings.Split(headers, ":"))
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatalln(err)
 	}
-	if err := signmessage(sig, key, *nl, unstuff, headeronly); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if err := signMessage(sig, key, nl, unstuff, headerOnly); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 }

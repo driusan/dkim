@@ -1,54 +1,84 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"github.com/driusan/dkim/pkg/algorithms"
+	"log"
 	"os"
 
-	"encoding/pem"
-	//	"encoding/gob"
-	//"encoding/asn1"
-	"crypto/x509"
 	"encoding/base64"
-
-	"crypto/rand"
-	"crypto/rsa"
+	"encoding/pem"
 )
 
 func main() {
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	var algorithmInput, outputPath, dnsOutputPath string
+	var keySize int
+	flag.StringVar(&algorithmInput, "a", "rsa-sha256", "Algorithm")
+	flag.IntVar(&keySize, "s", -1, "Key Size (for RSA)")
+	flag.StringVar(&outputPath, "o", "privkey.pem", "Save location for the PEM encoded private key")
+	flag.StringVar(&dnsOutputPath, "d", "dns.txt", "Save location for the TXT DNS entry")
+	flag.Parse()
+
+	if outputPath == "" {
+		log.Fatal("invalid output path")
 	}
 
-	asn1bytes, err := x509.MarshalPKIXPublicKey(&pk.PublicKey)
+	if dnsOutputPath == "" {
+		log.Fatal( "invalid DNS output path")
+	}
+
+	algorithm := algorithms.Find(algorithmInput)
+	if algorithm == nil {
+		log.Fatalf("invalid algorithm provided, %s does not exist\n", algorithmInput)
+	}
+
+	if keySize != -1 {
+		switch algorithm.(type) {
+		case *algorithms.RsaSha256:
+			algorithm.(*algorithms.RsaSha256).SetKeySize(keySize)
+		case *algorithms.RsaSha1:
+			algorithm.(*algorithms.RsaSha1).SetKeySize(keySize)
+		}
+	}
+	
+	privKey, pubKey, err := algorithm.GenerateKey()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 
-	f, err := os.Create("dns.txt")
+	privKeyPem, err := algorithm.ExportPrivateKey(privKey)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(3)
 	}
 
-	b64 := base64.StdEncoding.EncodeToString(asn1bytes)
-	fmt.Fprintf(f, "v=DKIM1; k=rsa; p=%s", b64)
-	f.Close()
-
-	f, err = os.Create("private.pem")
+	pubKeyBytes, err := algorithm.ExportPublicKeyBytes(pubKey)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(3)
+	}
+
+	f, err := os.Create(dnsOutputPath)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(4)
 	}
-	err = pem.Encode(f, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(pk),
-	})
+
+	b64 := base64.StdEncoding.EncodeToString(pubKeyBytes)
+	_, _ = fmt.Fprintf(f, "v=DKIM1; k=%s; p=%s", algorithm.BaseName(), b64)
+	f.Close()
+
+	f, err = os.Create(outputPath)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(5)
+	}
+	err = pem.Encode(f, privKeyPem)
+	if err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(6)
 
 	}
 	f.Close()

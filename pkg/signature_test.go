@@ -1,6 +1,8 @@
 package dkim
 
 import (
+	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -78,4 +80,55 @@ func TestParseSignature(t *testing.T) {
 			t.Errorf("Case %d: got %v want %v", i, *got, tc.Expected)
 		}
 	}
+}
+
+func TestMySignature(t *testing.T){
+	const mail=`DKIM-Signature: v=1; a=ed25519-sha256; c=relaxed/relaxed; d=denv.it; s=dkim; h=From:Subject:To:Date; bh=OtkrXxv14T+F6uhQyzH47PWSt1t+ylmui9+0BU1g9gY=; b=AcHNxiJiKGhXCSQMlTZTLkRevyRcer8ByFfIVtQZJFLGDfUGRWR8g27TMaY1lx5Keebyog/jyGV+6YfQySXXBA==
+Received: from _
+	by mail.ded2.denv.it (chasquid) with ESMTPSA
+	tls TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+	(over submission, TLS-1.2, envelope from "denys@denv.it")
+	; Sun, 31 May 2020 12:45:12 +0000
+MIME-Version: 1.0
+Date: Sun, 31 May 2020 12:45:12 +0000
+Content-Type: multipart/alternative;
+ boundary="--=_RainLoop_515_726042556.1590929112"
+X-Mailer: RainLoop/1.14.0
+From: denys@denv.it
+Message-ID: <2c321e8c3622fa4d7bc291de4b6a4ead@denv.it>
+Subject: test dkim
+To: denys.vitali@gmail.com
+
+
+----=_RainLoop_515_726042556.1590929112
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+dkim test
+
+----=_RainLoop_515_726042556.1590929112
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta http-equiv=3D"Content-Type" content=3D"t=
+ext/html; charset=3Dutf-8" /></head><body><div data-html-editor-font-wrap=
+per=3D"true" style=3D"font-family: arial, sans-serif; font-size: 13px;">d=
+kim test<br><br><signature></signature></div></body></html>
+
+----=_RainLoop_515_726042556.1590929112--`
+
+	const dnsRecord = `v=DKIM1; k=ed25519; p=B8MDQdyVkX4sFJ1MIk7XRyH39grXCF5SKkaietDfeSI=`
+
+	r, err := FileBuffer(NormalizeReader(strings.NewReader(mail)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubKey, err := DecodeDNSTXT(dnsRecord)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = VerifyWithPublicKey(r, pubKey)
+	assert.Nil(t, err)
 }

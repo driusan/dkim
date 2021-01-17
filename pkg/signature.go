@@ -3,17 +3,18 @@ package dkim
 import (
 	"bufio"
 	"bytes"
+	"crypto/ed25519"
+	"crypto/x509"
 	"fmt"
+	"github.com/driusan/dkim/pkg/algorithms"
 	"io"
 	"net"
 
 	"encoding/base64"
 
 	"crypto"
-	"crypto/rsa"
-	"crypto/sha1"
+	_ "crypto/ed25519"
 	"crypto/sha256"
-	"crypto/x509"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,10 +66,10 @@ func (s Signature) String() string {
 	return ret
 }
 
-func NewSignature(canon string, selector, domain string, headers []string) (Signature, error) {
+func NewSignature(canon string, selector string, algorithm algorithms.Algorithm, domain string, headers []string) (Signature, error) {
 	sig := Signature{
 		Version:                1,
-		Algorithm:              "rsa-sha256",
+		Algorithm:              algorithm.Name(),
 		Domain:                 domain,
 		HeaderCanonicalization: "simple",
 		BodyCanonicalization:   "simple",
@@ -184,24 +185,24 @@ type Header struct {
 // If s is passed, it will be used as the DKIM signature (for signing), otherwise
 // the signature will be parsed from the message header (for verification). When
 // signing, sig.BodyHash will be populated, and when verifying, it will be compared
-func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimheader []byte, err error) {
+func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimHeader []byte, err error) {
 	headers := make(map[string][]Header)
 	for raw, conv, err := ReadSMTPHeaderRelaxed(r); err == nil; raw, conv, err = ReadSMTPHeaderRelaxed(r) {
 		split := bytes.SplitN(conv, []byte{':'}, 2)
 		name := string(split[0])
 		// headers acts as an upside-down stack. We add the oldest ones
 		// to the start, and consume from the front in dkimMessageBase.
-		headers[name] = append([]Header{Header{raw, conv}}, headers[name]...)
+		headers[name] = append([]Header{{raw, conv}}, headers[name]...)
 		if name == "dkim-signature" && s == nil {
 			sig = ParseSignature(raw)
 		}
 	}
-	cbody, err := ReadSMTPBodyRelaxed(r)
+	cBody, err := ReadSMTPBodyRelaxed(r)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	sha := sha256.Sum256(cbody[:])
-	encoded := string(base64.StdEncoding.EncodeToString(sha[:]))
+	sha := sha256.Sum256(cBody[:])
+	encoded := base64.StdEncoding.EncodeToString(sha[:])
 	if s != nil {
 		sig = s
 		s.BodyHash = encoded
@@ -216,63 +217,65 @@ func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimhead
 		return nil, nil, nil, fmt.Errorf("Permanent failure: body hash does not match")
 	}
 
-	var tohash []byte
+	var toHash []byte
 	for _, h := range sig.Headers {
-		var hval Header
+		var hVal Header
 		lh := strings.ToLower(h)
 		if header, ok := headers[lh]; ok && len(header) > 0 {
 			// If there is a header, consume it so that if a header
 			// is included in sig.Headers multiple times the next
 			// one is correct.
-			hval = header[0]
+			hVal = header[0]
 			headers[lh] = header[1:]
 		}
 		switch sig.HeaderCanonicalization {
 		case "simple":
-			tohash = append(tohash, hval.Raw...)
+			toHash = append(toHash, hVal.Raw...)
 		case "relaxed":
-			tohash = append(tohash, hval.Relaxed...)
+			toHash = append(toHash, hVal.Relaxed...)
 		}
 	}
-	var sighead []byte
-	rawsig, ok := headers["dkim-signature"]
+	var signatureHead []byte
+	rawSignature, ok := headers["dkim-signature"]
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("Permanent failure: No DKIM-Signature")
 	}
 	if sig.HeaderCanonicalization == "relaxed" {
-		sighead = bytes.TrimRight(rawsig[0].Relaxed, "\r\n")
+		signatureHead = bytes.TrimRight(rawSignature[0].Relaxed, "\r\n")
 	} else {
-		sighead = bytes.TrimRight(rawsig[0].Raw, "\r\n")
+		signatureHead = bytes.TrimRight(rawSignature[0].Raw, "\r\n")
 	}
-	return sig, tohash, sighead, nil
+	return sig, toHash, signatureHead, nil
 
 }
 
 var bRE = regexp.MustCompile("b=.+($|;)")
 
-func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key crypto.PrivateKey, nl string) error {
 	if nl != "\n" {
 		nl = "\r\n"
 	}
-	sig, msg, basedkimsig, err := signatureBase(r, &s)
-	b, err := signDKIMMessage(msg, basedkimsig, s.Algorithm, key)
+	sig, msg, baseDKIMSignature, err := signatureBase(r, &s)
+	algorithm := algorithms.Find(s.Algorithm)
+	b, err := signDKIMMessage(msg, baseDKIMSignature, algorithm, key)
 	if err != nil {
 		return err
 	}
 	sig.Body = b
-	fmt.Fprintf(dst, "%v%v", sig, nl)
+	_, _ = fmt.Fprintf(dst, "%v%v", sig, nl)
 	return nil
 }
 
 // SignMessage signs the message in r with the signature parameters from s and
 // the private key key, writing the result with the added DKIM-Signature to
 // dst.
-func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
+func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key crypto.PrivateKey, nl string) error {
 	if nl != "\n" {
 		nl = "\r\n"
 	}
-	sig, msg, basedkimsig, err := signatureBase(r, &s)
-	b, err := signDKIMMessage(msg, basedkimsig, s.Algorithm, key)
+	sig, msg, baseDKIMSignature, err := signatureBase(r, &s)
+	algorithm := algorithms.Find(s.Algorithm)
+	b, err := signDKIMMessage(msg, baseDKIMSignature, algorithm, key)
 	if err != nil {
 		return err
 	}
@@ -280,23 +283,23 @@ func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKe
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	linescan := bufio.NewScanner(r)
+	lineScanner := bufio.NewScanner(r)
 	addedSig := false
-	for linescan.Scan() {
-		if err := linescan.Err(); err != nil {
+	for lineScanner.Scan() {
+		if err := lineScanner.Err(); err != nil {
 			return err
 		}
-		line := linescan.Text()
+		line := lineScanner.Text()
 		if strings.HasPrefix(line, "From ") {
-			fmt.Fprintf(dst, "%v%v", line, nl)
+			_, _ = fmt.Fprintf(dst, "%v%v", line, nl)
 			continue
 		}
 		if !addedSig {
 			addedSig = true
-			fmt.Fprintf(dst, "%v%v", sig, nl)
-			fmt.Fprintf(dst, "%v%v", line, nl)
+			_, _ = fmt.Fprintf(dst, "%v%v", sig, nl)
+			_, _ = fmt.Fprintf(dst, "%v%v", line, nl)
 		} else {
-			fmt.Fprintf(dst, "%v%v", line, nl)
+			_, _ = fmt.Fprintf(dst, "%v%v", line, nl)
 		}
 	}
 	return nil
@@ -304,27 +307,15 @@ func SignMessage(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKe
 
 // signDKIMMessage signs a message that has already been canonicalized according
 // to the DKIM standard.
-func signDKIMMessage(message, dkimsig []byte, algorithm string, key *rsa.PrivateKey) (b string, err error) {
-	dkimsig = bRE.ReplaceAll(dkimsig, []byte{'b', '='})
-	message = append(message, dkimsig...)
-	switch algorithm {
-	case "rsa-sha256", "sha256":
-		hash := sha256.Sum256(message)
-		v, err := rsa.SignPKCS1v15(nil, key, crypto.SHA256, hash[:])
-		if err != nil {
-			return "", err
-		}
-		return base64.StdEncoding.EncodeToString(v), nil
+func signDKIMMessage(message, dkimSignature []byte, algorithm algorithms.Algorithm, key crypto.PrivateKey) (b string, err error) {
+	dkimSignature = bRE.ReplaceAll(dkimSignature, []byte{'b', '='})
+	message = append(message, dkimSignature...)
 
-	case "rsa-sha1", "sha1":
-		hash := sha1.Sum(message)
-		v, err := rsa.SignPKCS1v15(nil, key, crypto.SHA1, hash[:])
-		if err != nil {
-			return "", err
-		}
-		return base64.StdEncoding.EncodeToString(v), nil
+	if algorithm == nil {
+		return "", fmt.Errorf("permanent failure: unknown algorithm")
 	}
-	return "", fmt.Errorf("Permanent failure: unknown algorithm")
+
+	return algorithm.Sign(message, key)
 }
 
 // dkimVerify verifies that a message verifies with header of dkimsig and a
@@ -337,24 +328,20 @@ func signDKIMMessage(message, dkimsig []byte, algorithm string, key *rsa.Private
 // This function is mostly for testing with a known key. In general, you should use the
 // Verify function which does the same thing, but extracts the public key from the appropriate
 // place according to the dkimsig.
-func dkimVerify(message, dkimsig []byte, sig []byte, algorithm string, key *rsa.PublicKey) error {
-	dkimsig = bRE.ReplaceAll(dkimsig, []byte{'b', '='})
-	message = append(message, dkimsig...)
-	switch algorithm {
-	case "rsa-sha256", "sha256":
-		hash := sha256.Sum256(message)
-		return rsa.VerifyPKCS1v15(key, crypto.SHA256, hash[:], sig)
-	case "rsa-sha1", "sha1":
-		hash := sha1.Sum(message)
-		return rsa.VerifyPKCS1v15(key, crypto.SHA1, hash[:], sig)
+func dkimVerify(message, dkimSignature []byte, sig []byte, algorithm algorithms.Algorithm, key interface{}) error {
+	dkimSignature = bRE.ReplaceAll(dkimSignature, []byte{'b', '='})
+	message = append(message, dkimSignature...)
+
+	if algorithm == nil {
+		return fmt.Errorf("permanent failure: unknown algorithm")
 	}
-	return fmt.Errorf("Permanent failure: unknown algorithm")
+	return algorithm.Verify(message, sig,  key)
 }
 
 // VerifyWithPublicKey verifies a reader r, but uses the passed public key
 // instead of trying to extract the key from the DNS.
-func VerifyWithPublicKey(r io.ReadSeeker, key *rsa.PublicKey) error {
-	sig, msg, sighead, err := signatureBase(r, nil)
+func VerifyWithPublicKey(r io.ReadSeeker, key crypto.PublicKey) error {
+	sig, msg, signatureHead, err := signatureBase(r, nil)
 	if err != nil {
 		return err
 	}
@@ -363,11 +350,12 @@ func VerifyWithPublicKey(r io.ReadSeeker, key *rsa.PublicKey) error {
 			return err
 		}
 	}
-	sighash, err := base64.StdEncoding.DecodeString(sig.Body)
+	signatureHash, err := base64.StdEncoding.DecodeString(sig.Body)
 	if err != nil {
 		return fmt.Errorf("Permanent failure: could not decode body")
 	}
-	return dkimVerify(msg, sighead, sighash, sig.Algorithm, key)
+	algorithm := algorithms.Find(sig.Algorithm)
+	return dkimVerify(msg, signatureHead, signatureHash, algorithm, key)
 }
 
 // Verify verifies the message from reader r has a valid DKIM signature.
@@ -377,27 +365,36 @@ func Verify(r io.ReadSeeker) error {
 	return VerifyWithPublicKey(r, nil)
 }
 
-func DecodeDNSTXT(txt string) (*rsa.PublicKey, error) {
-	// FIXME: This should check the k tag instead of assuming
-	// rsa
+func DecodeDNSTXT(txt string) (crypto.PublicKey, error) {
+	dkim := map[string]string{}
+
 	for _, tag := range splitTags([]byte(txt)) {
-		if tag.Name == "p" {
-			decoded, err := base64.StdEncoding.DecodeString(tag.Value)
-			if err != nil {
-				continue
-			}
-			key, err := x509.ParsePKIXPublicKey(decoded)
-			if err != nil {
-				continue
-			}
-			if c, ok := key.(*rsa.PublicKey); ok {
-				return c, nil
-			}
-		}
+		dkim[tag.Name] = tag.Value
 	}
-	return nil, fmt.Errorf("No key found")
+
+
+	decoded, err := base64.StdEncoding.DecodeString(dkim["p"])
+	if err != nil {
+		return nil, err
+	}
+
+	switch dkim["k"] {
+	case "rsa":
+		key, err := x509.ParsePKIXPublicKey(decoded)
+		if err != nil {
+			return nil, err
+		}
+		if c, ok := key.(crypto.PublicKey); ok {
+			return c, nil
+		}
+	case "ed25519":
+		pubKey := ed25519.PublicKey(decoded)
+		return pubKey, nil
+	}
+
+	return nil, fmt.Errorf("no key found")
 }
-func lookupKeyFromDNS(loc string) (*rsa.PublicKey, error) {
+func lookupKeyFromDNS(loc string) (crypto.PublicKey, error) {
 	txt, err := net.LookupTXT(loc)
 	if err != nil {
 		return nil, fmt.Errorf("Temporary failure: %v", err)
@@ -407,5 +404,5 @@ func lookupKeyFromDNS(loc string) (*rsa.PublicKey, error) {
 			return key, nil
 		}
 	}
-	return nil, fmt.Errorf("Permanent error: no public key found")
+	return nil, fmt.Errorf("permanent error: no public key found")
 }

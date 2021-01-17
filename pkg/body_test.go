@@ -8,7 +8,7 @@ import (
 /*
 func TestSimpleBody(t *testing.T) {
 	tests := []struct {
-		rawbody  string
+		rawBody  string
 		expected []string
 	}{
 		// Normal case
@@ -29,7 +29,7 @@ func TestSimpleBody(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		body := strings.NewReader(tc.rawbody)
+		body := strings.NewReader(tc.rawBody)
 		for j, h := range tc.expected {
 			_, converted, err := ReadSMTPHeaderSimple(body)
 			if err != nil {
@@ -44,9 +44,9 @@ func TestSimpleBody(t *testing.T) {
 }
 */
 
-func TestRelaxeBody(t *testing.T) {
+func TestRelaxedBody(t *testing.T) {
 	tests := []struct {
-		rawbody  string
+		rawBody  string
 		expected string
 	}{
 		// Normal case
@@ -58,7 +58,7 @@ func TestRelaxeBody(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		body := strings.NewReader(tc.rawbody)
+		body := strings.NewReader(tc.rawBody)
 		got, err := ReadSMTPBodyRelaxed(body)
 		if err != nil {
 			t.Errorf("Case %d: %v", i, err)
