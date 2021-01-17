@@ -68,7 +68,8 @@ func (e *ed25519Sha256) GenerateKey() (crypto.PrivateKey, crypto.PublicKey, erro
 }
 
 func generateKeyED25519() (crypto.PrivateKey, crypto.PublicKey, error) {
-	return ed25519.GenerateKey(rand.Reader)
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	return private, public, err
 }
 
 func (e *ed25519Sha256) ParsePrivateKey(block *pem.Block) (crypto.PrivateKey, error) {
