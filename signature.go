@@ -248,7 +248,7 @@ func signatureBase(r io.ReadSeeker, s *Signature) (sig *Signature, msg, dkimhead
 
 }
 
-var bRE = regexp.MustCompile("b=.+($|;)")
+var bRE = regexp.MustCompile("b=[^;]+")
 
 func SignedHeader(s Signature, r io.ReadSeeker, dst io.Writer, key *rsa.PrivateKey, nl string) error {
 	if nl != "\n" {
